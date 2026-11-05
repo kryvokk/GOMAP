@@ -41,6 +41,12 @@ func newRootCommand(out io.Writer) *cobra.Command {
 					return err
 				}
 				for _, result := range results {
+					if result.Error != "" {
+						if _, err := fmt.Fprintf(cmd.OutOrStdout(), "ERROR  %s  %s\n", result.Path, result.Error); err != nil {
+							return err
+						}
+						continue
+					}
 					if _, err := fmt.Fprintf(cmd.OutOrStdout(), "SHA256  %s  SIZE  %d  TYPE  %s  %s\n", result.SHA256, result.Size, result.MIMEType, result.Path); err != nil {
 						return err
 					}

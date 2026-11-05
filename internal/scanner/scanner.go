@@ -21,6 +21,7 @@ type Result struct {
 	Size     int64
 	SHA256   string
 	MIMEType string
+	Error    string
 }
 
 type Scanner struct {
@@ -39,17 +40,20 @@ func (s Scanner) ScanPath(path string) ([]Result, error) {
 		var results []Result
 		err := filepath.WalkDir(path, func(current string, entry os.DirEntry, walkErr error) error {
 			if walkErr != nil {
-				return walkErr
+				results = append(results, Result{Path: current, Error: walkErr.Error()})
+				return nil
 			}
 			if entry.Type()&os.ModeSymlink != 0 {
-				return fmt.Errorf("scan %q: symbolic links are not supported", current)
+				results = append(results, Result{Path: current, Error: "symbolic links are not supported"})
+				return nil
 			}
 			if entry.IsDir() {
 				return nil
 			}
 			result, err := s.scanFile(current)
 			if err != nil {
-				return err
+				results = append(results, Result{Path: current, Error: err.Error()})
+				return nil
 			}
 			results = append(results, result)
 			return nil
@@ -70,6 +74,18 @@ func (s Scanner) scanFile(path string) (Result, error) {
 	limit := s.MaxFileSize
 	if limit <= 0 {
 		limit = DefaultMaxFileSize
+	}
+	// Inspect the path before opening it. Opening a FIFO can otherwise block
+	// indefinitely, and opening a device may have side effects.
+	pathInfo, err := os.Lstat(path)
+	if err != nil {
+		return Result{}, fmt.Errorf("inspect %q: %w", path, err)
+	}
+	if pathInfo.Mode()&os.ModeSymlink != 0 {
+		return Result{}, fmt.Errorf("scan %q: symbolic links are not supported", path)
+	}
+	if !pathInfo.Mode().IsRegular() {
+		return Result{}, fmt.Errorf("scan %q: only regular files are supported", path)
 	}
 	file, err := os.Open(path)
 	if err != nil {
