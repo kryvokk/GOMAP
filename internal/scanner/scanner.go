@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/kryvokk/GOMAP/internal/peinfo"
 	"github.com/kryvokk/GOMAP/internal/signatures"
 	"io"
 	"net/http"
@@ -31,6 +32,8 @@ type Result struct {
 	Modified    time.Time
 	HasMZHeader bool
 	HasPEHeader bool
+	PE          *peinfo.Info
+	PEError     string
 }
 
 type Scanner struct {
@@ -124,7 +127,14 @@ func (s Scanner) scanFile(path string) (Result, error) {
 	if len(data) > 0 {
 		mimeType = http.DetectContentType(data)
 	}
-	return Result{Path: path, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), MIMEType: mimeType, Signatures: matchSignatures(data, s.Signatures), Extension: strings.ToLower(filepath.Ext(path)), Modified: info.ModTime().UTC(), HasMZHeader: len(data) >= 2 && data[0] == 'M' && data[1] == 'Z', HasPEHeader: bytes.Contains(data, []byte("PE\x00\x00"))}, nil
+	result := Result{Path: path, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), MIMEType: mimeType, Signatures: matchSignatures(data, s.Signatures), Extension: strings.ToLower(filepath.Ext(path)), Modified: info.ModTime().UTC(), HasMZHeader: len(data) >= 2 && data[0] == 'M' && data[1] == 'Z', HasPEHeader: bytes.Contains(data, []byte("PE\x00\x00"))}
+	if result.HasMZHeader {
+		result.PE, err = peinfo.Parse(data)
+		if err != nil {
+			result.PEError = err.Error()
+		}
+	}
+	return result, nil
 }
 
 func matchSignatures(data []byte, rules []signatures.Rule) []string {
