@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"github.com/kryvokk/GOMAP/internal/report"
+	"github.com/kryvokk/GOMAP/internal/signatures"
 	"io"
 	"os"
 
@@ -34,27 +36,41 @@ func newRootCommand(out io.Writer) *cobra.Command {
 		Short: "Scan files and directories without executing files",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			format, _ := cmd.Flags().GetString("format")
+			rulePath, _ := cmd.Flags().GetString("signatures")
+			outputPath, _ := cmd.Flags().GetString("output")
 			fileScanner := scanner.Scanner{}
+			if rulePath != "" {
+				rules, err := signatures.Load(rulePath)
+				if err != nil {
+					return err
+				}
+				fileScanner.Signatures = rules
+			}
+			var all []scanner.Result
 			for _, path := range args {
 				results, err := fileScanner.ScanPath(path)
 				if err != nil {
 					return err
 				}
-				for _, result := range results {
-					if result.Error != "" {
-						if _, err := fmt.Fprintf(cmd.OutOrStdout(), "ERROR  %s  %s\n", result.Path, result.Error); err != nil {
-							return err
-						}
-						continue
-					}
-					if _, err := fmt.Fprintf(cmd.OutOrStdout(), "SHA256  %s  SIZE  %d  TYPE  %s  %s\n", result.SHA256, result.Size, result.MIMEType, result.Path); err != nil {
-						return err
-					}
-				}
+				all = append(all, results...)
 			}
-			return nil
+			w := cmd.OutOrStdout()
+			if outputPath != "" {
+				f, err := os.Create(outputPath)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				w = f
+			}
+			return report.Write(w, format, all)
 		},
 	})
+	scan := root.Commands()[1]
+	scan.Flags().String("format", "text", "report format: text, json, or html")
+	scan.Flags().String("output", "", "write report to this file")
+	scan.Flags().String("signatures", "", "load local signature rules (name=hex-bytes per line)")
 	return root
 }
 
