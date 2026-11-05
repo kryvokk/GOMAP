@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 const DefaultMaxFileSize int64 = 64 << 20
@@ -19,12 +21,16 @@ const DefaultMaxFileSize int64 = 64 << 20
 var ErrFileTooLarge = errors.New("file exceeds maximum allowed size")
 
 type Result struct {
-	Path       string
-	Size       int64
-	SHA256     string
-	MIMEType   string
-	Error      string
-	Signatures []string
+	Path        string
+	Size        int64
+	SHA256      string
+	MIMEType    string
+	Error       string
+	Signatures  []string
+	Extension   string
+	Modified    time.Time
+	HasMZHeader bool
+	HasPEHeader bool
 }
 
 type Scanner struct {
@@ -118,7 +124,7 @@ func (s Scanner) scanFile(path string) (Result, error) {
 	if len(data) > 0 {
 		mimeType = http.DetectContentType(data)
 	}
-	return Result{Path: path, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), MIMEType: mimeType, Signatures: matchSignatures(data, s.Signatures)}, nil
+	return Result{Path: path, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), MIMEType: mimeType, Signatures: matchSignatures(data, s.Signatures), Extension: strings.ToLower(filepath.Ext(path)), Modified: info.ModTime().UTC(), HasMZHeader: len(data) >= 2 && data[0] == 'M' && data[1] == 'Z', HasPEHeader: bytes.Contains(data, []byte("PE\x00\x00"))}, nil
 }
 
 func matchSignatures(data []byte, rules []signatures.Rule) []string {
