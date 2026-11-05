@@ -10,9 +10,10 @@
 
 ## Phase 2 — File scanner
 
-- Read individual files and directories safely
+- [x] Read individual files as a stream and calculate SHA256
+- [ ] Read directories safely
 - Handle invalid paths, permissions, symbolic links, and size limits
-- Calculate SHA256 and identify file types
+- Identify file types
 
 ## Later phases
 
