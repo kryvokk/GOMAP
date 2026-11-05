@@ -2,10 +2,12 @@
 package scanner
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/kryvokk/GOMAP/internal/signatures"
 	"io"
 	"net/http"
 	"os"
@@ -17,15 +19,17 @@ const DefaultMaxFileSize int64 = 64 << 20
 var ErrFileTooLarge = errors.New("file exceeds maximum allowed size")
 
 type Result struct {
-	Path     string
-	Size     int64
-	SHA256   string
-	MIMEType string
-	Error    string
+	Path       string
+	Size       int64
+	SHA256     string
+	MIMEType   string
+	Error      string
+	Signatures []string
 }
 
 type Scanner struct {
 	MaxFileSize int64
+	Signatures  []signatures.Rule
 }
 
 func (s Scanner) ScanPath(path string) ([]Result, error) {
@@ -114,5 +118,15 @@ func (s Scanner) scanFile(path string) (Result, error) {
 	if len(data) > 0 {
 		mimeType = http.DetectContentType(data)
 	}
-	return Result{Path: path, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), MIMEType: mimeType}, nil
+	return Result{Path: path, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), MIMEType: mimeType, Signatures: matchSignatures(data, s.Signatures)}, nil
+}
+
+func matchSignatures(data []byte, rules []signatures.Rule) []string {
+	var matched []string
+	for _, rule := range rules {
+		if len(rule.Bytes) > 0 && bytes.Contains(data, rule.Bytes) {
+			matched = append(matched, rule.Name)
+		}
+	}
+	return matched
 }
