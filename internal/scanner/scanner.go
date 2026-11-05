@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kryvokk/GOMAP/internal/peinfo"
+	"github.com/kryvokk/GOMAP/internal/risk"
 	"github.com/kryvokk/GOMAP/internal/signatures"
 	"io"
 	"net/http"
@@ -34,6 +35,7 @@ type Result struct {
 	HasPEHeader bool
 	PE          *peinfo.Info
 	PEError     string
+	Risk        risk.Assessment
 }
 
 type Scanner struct {
@@ -134,6 +136,7 @@ func (s Scanner) scanFile(path string) (Result, error) {
 			result.PEError = err.Error()
 		}
 	}
+	result.Risk = risk.Assess(result.Signatures, result.HasMZHeader, result.PE != nil)
 	return result, nil
 }
 
