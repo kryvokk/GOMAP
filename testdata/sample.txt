@@ -1,0 +1,1 @@
+GoMalScan safe test sample
