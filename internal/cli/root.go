@@ -2,10 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"github.com/kryvokk/GOMAP/internal/history"
 	"github.com/kryvokk/GOMAP/internal/report"
 	"github.com/kryvokk/GOMAP/internal/signatures"
 	"io"
 	"os"
+	"time"
 
 	"github.com/kryvokk/GOMAP/internal/scanner"
 	"github.com/spf13/cobra"
@@ -55,6 +57,13 @@ func newRootCommand(out io.Writer) *cobra.Command {
 				}
 				all = append(all, results...)
 			}
+			historyPath, err := history.DefaultPath()
+			if err != nil {
+				return err
+			}
+			if err := history.Append(historyPath, all); err != nil {
+				return fmt.Errorf("save scan history: %w", err)
+			}
 			w := cmd.OutOrStdout()
 			if outputPath != "" {
 				f, err := os.Create(outputPath)
@@ -67,6 +76,22 @@ func newRootCommand(out io.Writer) *cobra.Command {
 			return report.Write(w, format, all)
 		},
 	})
+	root.AddCommand(&cobra.Command{Use: "history", Short: "Show recent local scans", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+		path, err := history.DefaultPath()
+		if err != nil {
+			return err
+		}
+		records, err := history.Read(path, 20)
+		if err != nil {
+			return err
+		}
+		for _, record := range records {
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s  %d file entries\n", record.Time.Format(time.RFC3339), len(record.Results)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}})
 	scan := root.Commands()[1]
 	scan.Flags().String("format", "text", "report format: text, json, or html")
 	scan.Flags().String("output", "", "write report to this file")
