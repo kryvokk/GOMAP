@@ -36,6 +36,8 @@ type Result struct {
 	PE          *peinfo.Info
 	PEError     string
 	Risk        risk.Assessment
+	YARAMatches []string
+	ThreatIntel string
 }
 
 type Scanner struct {

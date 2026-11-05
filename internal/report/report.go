@@ -39,6 +39,16 @@ func Write(w io.Writer, format string, results []scanner.Result) error {
 					return err
 				}
 			}
+			for _, match := range r.YARAMatches {
+				if _, err := fmt.Fprintf(w, "  YARA: %s\n", match); err != nil {
+					return err
+				}
+			}
+			if r.ThreatIntel != "" {
+				if _, err := fmt.Fprintf(w, "  Threat intelligence: %s\n", r.ThreatIntel); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	default:
